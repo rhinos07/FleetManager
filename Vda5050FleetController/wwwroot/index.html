@@ -100,7 +100,11 @@
         <span>Fahrzeug (Busy/Driving)</span>
       </div>
       <div class="legend-item">
-        <div class="legend-color" style="background: #ef4444;"></div>
+        <div class="legend-color" style="background: #8b5cf6;"></div>
+        <span>Fahrzeug (Charging)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #ef4444; border-radius: 50%;"></div>
         <span>Aktiver Auftrag</span>
       </div>
     </div>
@@ -149,6 +153,9 @@
     const NODE_RADIUS = 8;
     const VEHICLE_RADIUS = 12;
     const ORDER_ID_DISPLAY_LENGTH = 8;
+    
+    // Order status constants (must match backend TransportStatus enum)
+    const ACTIVE_ORDER_STATUSES = ["Pending", "Assigned", "InProgress"];
 
     // Helper functions
     function formatVehicleId(vehicleId) {
@@ -221,7 +228,7 @@
       // Draw active orders on source nodes
       if (showOrders && status.orders) {
         status.orders.forEach(order => {
-          if (order.status === "Pending" || order.status === "Assigned" || order.status === "InProgress") {
+          if (ACTIVE_ORDER_STATUSES.includes(order.status)) {
             const sourceNode = nodeMap[order.sourceId];
             if (sourceNode) {
               // Draw red indicator near source node
