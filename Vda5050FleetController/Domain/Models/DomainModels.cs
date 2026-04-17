@@ -119,6 +119,12 @@ public class TopologyMap
     public NodePosition? GetNode(string nodeId)
         => _nodes.GetValueOrDefault(nodeId);
 
+    public IEnumerable<(string NodeId, NodePosition Position)> GetAllNodes()
+        => _nodes.Select(kvp => (kvp.Key, kvp.Value));
+
+    public IEnumerable<(string EdgeId, string From, string To)> GetAllEdges()
+        => _edges.Select(kvp => (kvp.Key, kvp.Value.From, kvp.Value.To));
+
     // Simplified: returns direct edge between source and dest station nodes.
     // In production: A* or Dijkstra over the graph.
     public (List<Node> Nodes, List<Edge> Edges) BuildPath(string sourceNodeId, string destNodeId,
