@@ -98,7 +98,7 @@ docker compose -f docker/docker-compose.yml -f docker/docker-compose.demo.yml \
 | Swagger UI | http://localhost:8080/swagger | immer |
 | MQTT Broker | localhost:1883 | immer |
 | MQTT WebSocket | localhost:9001 | immer |
-| Seq Log-UI | http://localhost:5341 | `monitoring` |
+| Seq Log-UI | http://localhost:5342 | `monitoring` |
 | MQTT Explorer | http://localhost:4000 | `tools` |
 
 ### Mit Seq (strukturierte Log-Ansicht)
@@ -109,7 +109,7 @@ docker compose -f docker/docker-compose.yml --profile monitoring up --build
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.demo.yml --profile monitoring up --build
 ```
 
-Öffne **http://localhost:5341** — alle Logs von Fleet Controller und AGV-Simulator landen dort durchsuchbar mit Filtern nach `VehicleId`, `OrderId`, Log-Level etc.
+Öffne **http://localhost:5342** — alle Logs von Fleet Controller und AGV-Simulator landen dort durchsuchbar mit Filtern nach `VehicleId`, `OrderId`, Log-Level etc.
 
 ## Nützliche Befehle
 
