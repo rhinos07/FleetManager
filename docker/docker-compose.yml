@@ -87,8 +87,10 @@ services:
     restart: unless-stopped
     environment:
       - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_NOAUTHENTICATION=true
     ports:
-      - "5341:5341"   # ingestion + UI
+      - "5341:5341"   # ingestion (Serilog sink)
+      - "5342:80"     # web UI
     volumes:
       - seq-data:/data
     networks:

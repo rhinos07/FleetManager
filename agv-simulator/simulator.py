@@ -54,7 +54,6 @@ def _setup_logging() -> None:
             batch_size=10,
             auto_flush_timeout=2,
             override_root_logger=True,
-            additional_structured_properties=["serial", "order_id", "node_id"],
         )
     else:
         logging.basicConfig(
