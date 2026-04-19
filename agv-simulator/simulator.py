@@ -364,7 +364,8 @@ class AgvSimulator:
 
             # Acquire exclusive access to the target node before moving there.
             # If another vehicle is already there, we block until it departs.
-            prev_held = self._held_node
+            with self._lock:
+                prev_held = self._held_node
             if node_id != prev_held:
                 self._acquire_node(node_id)
 
