@@ -312,8 +312,8 @@ class AgvSimulator:
 
     def _release_node(self, node_id: str) -> None:
         """Give up exclusive hold on node_id."""
-        _get_node_lock(node_id).release()
         if self._held_node == node_id:
+            _get_node_lock(node_id).release()
             self._held_node = None
 
     # ── Order simulation ───────────────────────────────────────────────────────
@@ -363,13 +363,13 @@ class AgvSimulator:
             if node_id != prev_held:
                 self._acquire_node(node_id)
 
-            if dist > 0.05:
-                if i > 0 and i - 1 < len(edges):
-                    gone_edge = edges[i - 1]["edgeId"]
-                    with self._lock:
-                        self.state.edge_states = [
-                            e for e in self.state.edge_states if e["edgeId"] != gone_edge
-                        ]
+            # Update edge states when actually driving to a new node
+            if dist > 0.05 and i > 0 and i - 1 < len(edges):
+                gone_edge = edges[i - 1]["edgeId"]
+                with self._lock:
+                    self.state.edge_states = [
+                        e for e in self.state.edge_states if e["edgeId"] != gone_edge
+                    ]
 
             # Release the previous node as we depart from it
             if prev_held is not None and prev_held != node_id:
