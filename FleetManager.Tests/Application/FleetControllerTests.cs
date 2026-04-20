@@ -386,4 +386,150 @@ public class FleetControllerTests
         Assert.Single(status.Vehicles);
         Assert.Equal("Acme/SN-001", status.Vehicles[0].VehicleId);
     }
+
+    // ── Blocker resolution ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Creates a three-node topology  SRC –edge1– MID –edge2– DST
+    /// that gives <see cref="TopologyMap.GetNeighborNodeIds"/> something to work with.
+    /// </summary>
+    private static Fixture CreateFixtureWithEdges()
+    {
+        var registry = new VehicleRegistry(NullLogger<VehicleRegistry>.Instance);
+        var queue    = new TransportOrderQueue(NullLogger<TransportOrderQueue>.Instance);
+        var topology = new TopologyMap();
+        topology.AddNode("SRC", 0.0,  0.0, 0.0, "MAP-1");
+        topology.AddNode("MID", 5.0,  0.0, 0.0, "MAP-1");
+        topology.AddNode("DST", 10.0, 0.0, 0.0, "MAP-1");
+        topology.AddEdge("E-SRC-MID", "SRC", "MID");
+        topology.AddEdge("E-MID-DST", "MID", "DST");
+        var mqtt            = new FakeMqttService();
+        var statusPublisher = new FakeFleetStatusPublisher();
+        var controller      = new FleetController(
+            registry, queue, topology, mqtt,
+            statusPublisher,
+            persistence: null,
+            NullLogger<FleetController>.Instance);
+        return new Fixture(controller, registry, queue, mqtt, statusPublisher);
+    }
+
+    private static void MakeVehicleIdleAtNode(VehicleRegistry registry,
+        string manufacturer, string serial, string lastNodeId, AgvPosition? position = null)
+    {
+        var vehicle = registry.GetOrCreate(manufacturer, serial);
+        vehicle.ApplyState(new VehicleState
+        {
+            Manufacturer = manufacturer,
+            SerialNumber = serial,
+            LastNodeId   = lastNodeId,
+            Driving      = false,
+            AgvPosition  = position,
+            BatteryState = new BatteryState { BatteryCharge = 80.0 },
+            Errors       = [],
+            NodeStates   = [],
+            EdgeStates   = []
+        });
+    }
+
+    [Fact]
+    public async Task DispatchOrder_SendsDodgeOrder_WhenIdleVehicleBlocksSourceNode()
+    {
+        var f = CreateFixtureWithEdges();
+
+        // Vehicle A (the dispatcher) is available with no specific position.
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+        // Vehicle B is idle at SRC — the source node of the upcoming order.
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-002", "SRC");
+
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+
+        // A dodge order should have been sent to vehicle B (serial SN-002).
+        var dodgeOrder = f.Mqtt.PublishedOrders.FirstOrDefault(o => o.OrderId.StartsWith("DODGE-"));
+        Assert.NotNull(dodgeOrder);
+        Assert.Equal("SN-002", dodgeOrder.SerialNumber);
+
+        // The transport order should also have been dispatched.
+        var transportOrder = f.Mqtt.PublishedOrders.FirstOrDefault(o => !o.OrderId.StartsWith("DODGE-"));
+        Assert.NotNull(transportOrder);
+    }
+
+    [Fact]
+    public async Task DispatchOrder_DodgeOrderTargetIsFreeNeighbour()
+    {
+        var f = CreateFixtureWithEdges();
+
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-002", "SRC");
+
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+
+        var dodgeOrder = f.Mqtt.PublishedOrders.Single(o => o.OrderId.StartsWith("DODGE-"));
+        // Blocker was at SRC; MID is the only free neighbour of SRC.
+        Assert.Contains(dodgeOrder.Nodes, n => n.NodeId == "MID");
+    }
+
+    [Fact]
+    public async Task DispatchOrder_NoDodgeOrder_WhenNoVehicleBlocksPath()
+    {
+        var f = CreateFixtureWithEdges();
+
+        // Only the dispatched vehicle; it is not blocking any path node.
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+
+        Assert.DoesNotContain(f.Mqtt.PublishedOrders, o => o.OrderId.StartsWith("DODGE-"));
+    }
+
+    [Fact]
+    public async Task DispatchOrder_DodgeOrderHasNoPickOrDropActions()
+    {
+        var f = CreateFixtureWithEdges();
+
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-002", "SRC");
+
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+
+        var dodgeOrder = f.Mqtt.PublishedOrders.Single(o => o.OrderId.StartsWith("DODGE-"));
+        Assert.All(dodgeOrder.Nodes, n => Assert.Empty(n.Actions));
+    }
+
+    [Fact]
+    public async Task DispatchOrder_DodgeSentBeforeTransportOrder()
+    {
+        var f = CreateFixtureWithEdges();
+
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-002", "SRC");
+
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+
+        // The DODGE order must appear before the transport order in the publish list.
+        var dodgeIndex     = f.Mqtt.PublishedOrders.FindIndex(o => o.OrderId.StartsWith("DODGE-"));
+        var transportIndex = f.Mqtt.PublishedOrders.FindIndex(o => !o.OrderId.StartsWith("DODGE-"));
+        Assert.True(dodgeIndex < transportIndex,
+            "Dodge order should be published before the transport order");
+    }
+
+    [Fact]
+    public async Task Vehicle_TracksLastNodeId_AfterApplyState()
+    {
+        var f       = CreateFixtureWithEdges();
+        var vehicle = f.Registry.GetOrCreate("Acme", "SN-001");
+
+        vehicle.ApplyState(new VehicleState
+        {
+            Manufacturer = "Acme",
+            SerialNumber = "SN-001",
+            LastNodeId   = "SRC",
+            Driving      = false,
+            BatteryState = new BatteryState { BatteryCharge = 80.0 },
+            Errors       = [],
+            NodeStates   = [],
+            EdgeStates   = []
+        });
+
+        Assert.Equal("SRC", vehicle.LastNodeId);
+    }
 }
