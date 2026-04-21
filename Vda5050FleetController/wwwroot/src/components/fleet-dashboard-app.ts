@@ -95,6 +95,10 @@ export class FleetDashboardApp extends HTMLElement {
     this.querySelectorAll<HTMLElement>(".view").forEach((el) => {
       el.classList.toggle("hidden", el.dataset.view !== view);
     });
+
+    if (view === "order-history") {
+      this.orderHistory?.loadHistory();
+    }
   }
 
   private setupServiceListeners(): void {
@@ -139,7 +143,6 @@ export class FleetDashboardApp extends HTMLElement {
     // Update order list and history
     this.orderList?.updateOrders(status.orders);
     this.orderList?.updateNodes(status.nodes);
-    this.orderHistory?.updateOrders(status.orders);
   }
 }
 
