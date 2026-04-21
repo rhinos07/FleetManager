@@ -370,7 +370,7 @@ public class FleetController
         foreach (var blockedVehicle in blockedVehicles)
         {
             _log.LogInformation(
-                "Vehicle {BlockedId} is stopped mid-path waiting for {NodeId} (now held by idle {IdleId}); re-triggering blocker resolution",
+                "Vehicle {BlockedId} is stopped mid-path waiting for {NodeId} (now held by idle {IdleId}); retriggering blocker resolution",
                 blockedVehicle.VehicleId, idleVehicle.LastNodeId, idleVehicle.VehicleId);
 
             await TryResolveBlockersAsync(blockedVehicle.RemainingNodeIds!, blockedVehicle, ct);

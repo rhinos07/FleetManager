@@ -396,7 +396,10 @@ class AgvSimulator:
             if node_id != prev_held:
                 node_lock = _get_node_lock(node_id)
                 if not node_lock.acquire(blocking=False):
-                    # Node is occupied — inform fleet controller we are stopped and waiting
+                    # Node is occupied — inform fleet controller we are stopped and waiting,
+                    # then block until the node is free.  After node_lock.acquire() returns
+                    # we hold the lock in both branches, so _held_node is always set while
+                    # the lock is owned.
                     with self._lock:
                         self.state.driving = False
                         self.state.vx = 0.0
@@ -404,6 +407,7 @@ class AgvSimulator:
                     self._publish_state()
                     self._log.debug("Node %s occupied — waiting", node_id)
                     node_lock.acquire()
+                # Lock is now held (either acquired non-blocking above, or after waiting).
                 with self._lock:
                     self._held_node = node_id
 
