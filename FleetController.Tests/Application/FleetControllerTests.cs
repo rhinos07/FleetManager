@@ -533,4 +533,93 @@ public class FleetControllerTests
 
         Assert.Equal("SRC", vehicle.LastNodeId);
     }
+
+    // ── Dynamic blocker resolution (mid-path) ─────────────────────────────────
+
+    [Fact]
+    public async Task MidPathState_SendsDodgeOrder_WhenIdleVehicleBlocksRemainingNode()
+    {
+        var f = CreateFixtureWithEdges();
+
+        // SN-001 has an active order; simulate it stopped at SRC with MID still remaining
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+        f.Mqtt.PublishedOrders.Clear(); // clear dispatch orders; only care about dodge below
+
+        // SN-002 parks at MID after dispatch
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-002", "MID");
+
+        // SN-001 stops at SRC with MID and DST still in its nodeStates (not driving → likely blocked)
+        await f.Mqtt.SimulateStateAsync(new VehicleState
+        {
+            Manufacturer = "Acme",
+            SerialNumber = "SN-001",
+            OrderId      = f.Mqtt.PublishedOrders.FirstOrDefault()?.OrderId ?? "TO-test",
+            LastNodeId   = "SRC",
+            Driving      = false,
+            BatteryState = new BatteryState { BatteryCharge = 80.0 },
+            Errors       = [],
+            NodeStates   = [new NodeState { NodeId = "MID" }, new NodeState { NodeId = "DST" }],
+            EdgeStates   = []
+        });
+
+        var dodge = f.Mqtt.PublishedOrders.FirstOrDefault(o => o.OrderId.StartsWith("DODGE-"));
+        Assert.NotNull(dodge);
+        Assert.Equal("SN-002", dodge.SerialNumber);
+    }
+
+    [Fact]
+    public async Task MidPathState_NoDodgeOrder_WhenVehicleIsStillDriving()
+    {
+        var f = CreateFixtureWithEdges();
+
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+        f.Mqtt.PublishedOrders.Clear();
+
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-002", "MID");
+
+        // driving=true → vehicle is moving, not blocked; no dodge expected
+        await f.Mqtt.SimulateStateAsync(new VehicleState
+        {
+            Manufacturer = "Acme",
+            SerialNumber = "SN-001",
+            OrderId      = "TO-test",
+            LastNodeId   = "SRC",
+            Driving      = true,
+            BatteryState = new BatteryState { BatteryCharge = 80.0 },
+            Errors       = [],
+            NodeStates   = [new NodeState { NodeId = "MID" }, new NodeState { NodeId = "DST" }],
+            EdgeStates   = []
+        });
+
+        Assert.DoesNotContain(f.Mqtt.PublishedOrders, o => o.OrderId.StartsWith("DODGE-"));
+    }
+
+    [Fact]
+    public async Task MidPathState_NoDodgeOrder_WhenNoRemainingNodeStates()
+    {
+        var f = CreateFixtureWithEdges();
+
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-001", "DST");
+        MakeVehicleIdleAtNode(f.Registry, "Acme", "SN-002", "MID");
+        await f.Controller.RequestTransportAsync("SRC", "DST");
+        f.Mqtt.PublishedOrders.Clear();
+
+        // Vehicle reached its last node (nodeStates empty) → not blocked mid-path
+        await f.Mqtt.SimulateStateAsync(new VehicleState
+        {
+            Manufacturer = "Acme",
+            SerialNumber = "SN-001",
+            OrderId      = "TO-test",
+            LastNodeId   = "DST",
+            Driving      = false,
+            BatteryState = new BatteryState { BatteryCharge = 80.0 },
+            Errors       = [],
+            NodeStates   = [],
+            EdgeStates   = []
+        });
+
+        Assert.DoesNotContain(f.Mqtt.PublishedOrders, o => o.OrderId.StartsWith("DODGE-"));
+    }
 }

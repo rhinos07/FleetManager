@@ -259,7 +259,7 @@ public class FleetController
             dropActions);
 
         // Move any idle vehicle that is parked on a node the assigned vehicle needs to traverse
-        await TryResolveBlockersAsync(nodes, vehicle, ct);
+        await TryResolveBlockersAsync(nodes.Select(n => n.NodeId).ToList(), vehicle, ct);
 
         // Build VDA5050 order
         var vdaOrder = new Order
@@ -286,11 +286,12 @@ public class FleetController
     // ── Blocker resolution ───────────────────────────────────────────────────
 
     /// <summary>
-    /// For each node on <paramref name="pathNodes"/>, checks whether an idle vehicle (other than
+    /// For each node in <paramref name="pathNodeIds"/>, checks whether an idle vehicle (other than
     /// <paramref name="assignedVehicle"/>) is parked there.  If so, sends that vehicle a short
     /// "dodge" order to the nearest free adjacent node so it clears the way.
+    /// Called both at dispatch time and dynamically when a driving vehicle stops mid-path.
     /// </summary>
-    private async Task TryResolveBlockersAsync(List<Node> pathNodes,
+    private async Task TryResolveBlockersAsync(IReadOnlyList<string> pathNodeIds,
         Vehicle assignedVehicle, CancellationToken ct)
     {
         // Build a lookup: nodeId → list of idle vehicles parked there
@@ -308,33 +309,33 @@ public class FleetController
         // so we don't route two vehicles to the same spot.
         var pendingOccupied = new HashSet<string>(idleAtNode.Keys);
 
-        foreach (var pathNode in pathNodes)
+        foreach (var nodeId in pathNodeIds)
         {
-            if (!idleAtNode.TryGetValue(pathNode.NodeId, out var blockers))
+            if (!idleAtNode.TryGetValue(nodeId, out var blockers))
                 continue;
 
             foreach (var blocker in blockers)
             {
-                var dodgeTarget = _topology.GetNeighborNodeIds(pathNode.NodeId)
+                var dodgeTarget = _topology.GetNeighborNodeIds(nodeId)
                     .FirstOrDefault(n => !pendingOccupied.Contains(n));
 
                 if (dodgeTarget is null)
                 {
                     _log.LogWarning(
                         "No free neighbour for blocking vehicle {VehicleId} at node {NodeId}; skipping dodge",
-                        blocker.VehicleId, pathNode.NodeId);
+                        blocker.VehicleId, nodeId);
                     break;
                 }
 
                 _log.LogInformation(
                     "Vehicle {VehicleId} is blocking node {NodeId} — sending dodge order to {DodgeTarget}",
-                    blocker.VehicleId, pathNode.NodeId, dodgeTarget);
+                    blocker.VehicleId, nodeId, dodgeTarget);
 
-                await SendDodgeOrderAsync(blocker, pathNode.NodeId, dodgeTarget, ct);
+                await SendDodgeOrderAsync(blocker, nodeId, dodgeTarget, ct);
                 pendingOccupied.Add(dodgeTarget);
             }
 
-            pendingOccupied.Remove(pathNode.NodeId);
+            pendingOccupied.Remove(nodeId);
         }
     }
 
@@ -389,6 +390,16 @@ public class FleetController
         }
 
         await _persistence.SaveVehicleAsync(vehicle);
+
+        // Vehicle stopped mid-path with an active order → check if it is blocked by an idle AGV
+        // (driving=false with remaining nodeStates means the vehicle paused, likely waiting for a node to clear)
+        if (!state.Driving
+            && !string.IsNullOrEmpty(state.OrderId)
+            && state.NodeStates.Count > 0)
+        {
+            var remainingNodeIds = state.NodeStates.Select(ns => ns.NodeId).ToList();
+            await TryResolveBlockersAsync(remainingNodeIds, vehicle, ct: default);
+        }
 
         // Vehicle just became idle → try to assign next pending order
         if (!wasIdle && vehicle.IsAvailable)
