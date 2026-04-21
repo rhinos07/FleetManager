@@ -1,7 +1,7 @@
 using Vda5050FleetController.Application;
 using Vda5050FleetController.Application.Contracts;
 
-namespace FleetManager.Tests.Fakes;
+namespace FleetController.Tests.Fakes;
 
 public class FakeFleetStatusPublisher : IFleetStatusPublisher
 {

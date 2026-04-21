@@ -1,6 +1,6 @@
-# FleetManager Frontend
+# FleetController Frontend
 
-This directory contains the TypeScript-based WebComponents UI for the FleetManager dashboard.
+This directory contains the TypeScript-based WebComponents UI for the FleetController dashboard.
 
 ## Architecture
 

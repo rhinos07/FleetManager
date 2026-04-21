@@ -1,6 +1,6 @@
 using Vda5050FleetController.Infrastructure.Mqtt;
 
-namespace FleetManager.Tests.Infrastructure;
+namespace FleetController.Tests.Infrastructure;
 
 public class Vda5050TopicTests
 {

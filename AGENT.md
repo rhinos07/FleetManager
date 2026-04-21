@@ -74,7 +74,7 @@ dict (used only when the node has no `nodePosition` in the order message).
 ## What NOT To Do
 
 - Do not mock `IFleetRepository` in new tests — use `FakeFleetPersistenceService` from
-  `FleetManager.Tests/Fakes/` instead
+  `FleetController.Tests/Fakes/` instead
 - Do not add `if (demoMode)` branches in production code — demo behaviour belongs in the
   simulator or the overlay compose file
 - Do not hardcode topology nodes in `Program.cs` — the demo seeder in `TopologyStartupLoader`

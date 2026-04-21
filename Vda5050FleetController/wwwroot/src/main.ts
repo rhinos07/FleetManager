@@ -1,5 +1,5 @@
 /**
- * FleetManager Dashboard - Main Entry Point
+ * FleetController Dashboard - Main Entry Point
  *
  * This module imports all WebComponents and initializes the application.
  */
@@ -16,4 +16,4 @@ import "./components/fleet-order-history";
 import "./components/fleet-dashboard-app";
 
 // The components are now registered and ready to use
-console.log("FleetManager Dashboard initialized with WebComponents");
+console.log("FleetController Dashboard initialized with WebComponents");

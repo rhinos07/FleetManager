@@ -7,8 +7,8 @@ test.describe("Navigation menu", () => {
     await page.waitForSelector("fleet-nav-menu .nav-list");
   });
 
-  test("shows the FleetManager logo", async ({ page }) => {
-    await expect(page.locator(".nav-logo")).toHaveText("FleetManager");
+  test("shows the FleetController logo", async ({ page }) => {
+    await expect(page.locator(".nav-logo")).toHaveText("FleetController");
   });
 
   test("renders all five nav items", async ({ page }) => {

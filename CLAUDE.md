@@ -37,7 +37,7 @@ FleetController/
 │   │   ├── types/models.ts          # TypeScript mirrors of C# DTOs
 │   │   └── main.ts
 │   └── Program.cs                   # DI, Minimal API endpoints, hosted services
-├── FleetManager.Tests/              # xUnit unit tests
+├── FleetController.Tests/           # xUnit unit tests
 ├── agv-simulator/                   # Demo AGV simulator (Python)
 │   ├── simulator.py
 │   ├── Dockerfile
@@ -171,10 +171,10 @@ docker compose -f docker/docker-compose.yml --profile tools up --build
 ## Tests
 
 ```bash
-dotnet test FleetManager.Tests/FleetManager.Tests.csproj
+dotnet test FleetController.Tests/FleetController.Tests.csproj
 ```
 
-Fakes in `FleetManager.Tests/Fakes/`: `FakeMqttService`, `FakeFleetStatusPublisher`,
+Fakes in `FleetController.Tests/Fakes/`: `FakeMqttService`, `FakeFleetStatusPublisher`,
 `FakeFleetPersistenceService` — use these instead of mocking interfaces in new tests.
 
 ## Environment Variables (fleet-controller)

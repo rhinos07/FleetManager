@@ -1,16 +1,17 @@
-using FleetManager.Tests.Fakes;
+using FleetController.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vda5050FleetController.Application;
 using Vda5050FleetController.Domain.Models;
+using FC = Vda5050FleetController.Application.FleetController;
 
-namespace FleetManager.Tests.Application;
+namespace FleetController.Tests.Application;
 
 public class FleetControllerPersistenceTests
 {
     // ── Test fixture helpers ──────────────────────────────────────────────────
 
     private record PersistenceFixture(
-        FleetController             Controller,
+        FC             Controller,
         VehicleRegistry             Registry,
         TransportOrderQueue         Queue,
         FakeMqttService             Mqtt,
@@ -25,11 +26,11 @@ public class FleetControllerPersistenceTests
         topology.AddNode("DST", 10.0, 0.0, 0.0, "MAP-1");
         var mqtt        = new FakeMqttService();
         var persistence = new FakeFleetPersistenceService();
-        var controller  = new FleetController(
+        var controller  = new FC(
             registry, queue, topology, mqtt,
             statusPublisher: null,
             persistence,
-            NullLogger<FleetController>.Instance);
+            NullLogger<FC>.Instance);
 
         return new PersistenceFixture(controller, registry, queue, mqtt, persistence);
     }

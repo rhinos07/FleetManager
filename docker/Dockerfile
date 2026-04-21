@@ -11,13 +11,13 @@ RUN apt-get update && apt-get install -y curl && \
 # Copy solution and project files first (layer caching)
 COPY Vda5050FleetController.sln ./
 COPY Vda5050FleetController/Vda5050FleetController.csproj ./Vda5050FleetController/
-COPY FleetManager.Tests/FleetManager.Tests.csproj         ./FleetManager.Tests/
+COPY FleetController.Tests/FleetController.Tests.csproj         ./FleetController.Tests/
 
 RUN dotnet restore
 
 # Copy the rest of the source
 COPY Vda5050FleetController/ ./Vda5050FleetController/
-COPY FleetManager.Tests/     ./FleetManager.Tests/
+COPY FleetController.Tests/     ./FleetController.Tests/
 
 # Build frontend (TypeScript/WebComponents)
 WORKDIR /src/Vda5050FleetController/wwwroot
@@ -26,7 +26,7 @@ RUN npm install && npm run build
 WORKDIR /src
 
 # Run unit tests during build
-RUN dotnet test FleetManager.Tests/FleetManager.Tests.csproj \
+RUN dotnet test FleetController.Tests/FleetController.Tests.csproj \
     --no-restore \
     --configuration Release \
     --logger "console;verbosity=minimal"

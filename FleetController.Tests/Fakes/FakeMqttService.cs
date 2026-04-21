@@ -1,7 +1,7 @@
 using Vda5050FleetController.Domain.Models;
 using Vda5050FleetController.Infrastructure.Mqtt;
 
-namespace FleetManager.Tests.Fakes;
+namespace FleetController.Tests.Fakes;
 
 /// <summary>
 /// In-memory test double for IVda5050MqttService.

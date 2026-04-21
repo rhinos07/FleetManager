@@ -1,6 +1,6 @@
 using Vda5050FleetController.Domain.Models;
 
-namespace FleetManager.Tests.Domain;
+namespace FleetController.Tests.Domain;
 
 public class VehicleTests
 {

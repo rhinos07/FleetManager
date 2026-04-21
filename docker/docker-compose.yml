@@ -43,7 +43,7 @@ services:
     networks:
       - fleet-net
 
-  # ── FleetManager (ASP.NET Core 8) ────────────────────────────────────────────
+  # ── FleetController (ASP.NET Core 8) ────────────────────────────────────────────
   fleet-controller:
     build:
       context: ..                 # Repo-Root (eine Ebene über diesem Ordner)

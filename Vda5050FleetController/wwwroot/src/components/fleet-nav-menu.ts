@@ -11,7 +11,7 @@ export class FleetNavMenu extends HTMLElement {
   private render(): void {
     this.innerHTML = `
       <nav class="nav-menu">
-        <div class="nav-logo">FleetManager</div>
+        <div class="nav-logo">FleetController</div>
         <ul class="nav-list">
           <li class="nav-item active" data-view="dashboard">
             <span class="nav-icon">&#128202;</span>

@@ -3,7 +3,11 @@
     "allow": [
       "Bash(dotnet test:*)",
       "Bash(cd:*)",
-      "Bash(xargs ls *)"
+      "Bash(xargs ls *)",
+      "Bash(git mv *)",
+      "PowerShell(Rename-Item *)",
+      "Bash(git add *)",
+      "Bash(dotnet build *)"
     ]
   }
 }

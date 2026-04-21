@@ -3,7 +3,7 @@ using Vda5050FleetController.Application.Contracts;
 using Vda5050FleetController.Domain.Models;
 using Vda5050FleetController.Infrastructure.Persistence;
 
-namespace FleetManager.Tests.Fakes;
+namespace FleetController.Tests.Fakes;
 
 /// <summary>
 /// In-memory test double for IFleetPersistenceService.

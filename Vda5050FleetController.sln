@@ -4,7 +4,7 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vda5050FleetController", "Vda5050FleetController\Vda5050FleetController.csproj", "{119E6843-FBE5-C459-020B-B4EE9BFBA57D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetManager.Tests", "FleetManager.Tests\FleetManager.Tests.csproj", "{C3D4E5F6-A7B8-4C9D-0E1F-2A3B4C5D6E7F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FleetController.Tests", "FleetController.Tests\FleetController.Tests.csproj", "{C3D4E5F6-A7B8-4C9D-0E1F-2A3B4C5D6E7F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

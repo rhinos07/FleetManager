@@ -1,16 +1,17 @@
-using FleetManager.Tests.Fakes;
+using FleetController.Tests.Fakes;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vda5050FleetController.Application;
 using Vda5050FleetController.Domain.Models;
+using FC = Vda5050FleetController.Application.FleetController;
 
-namespace FleetManager.Tests.Application;
+namespace FleetController.Tests.Application;
 
 public class FleetControllerTests
 {
     // ── Test fixture helpers ──────────────────────────────────────────────────
 
     private record Fixture(
-        FleetController    Controller,
+        FC    Controller,
         VehicleRegistry    Registry,
         TransportOrderQueue Queue,
         FakeMqttService    Mqtt,
@@ -25,11 +26,11 @@ public class FleetControllerTests
         topology.AddNode("DST", 10.0, 0.0, 0.0, "MAP-1");
         var mqtt       = new FakeMqttService();
         var statusPublisher = new FakeFleetStatusPublisher();
-        var controller = new FleetController(
+        var controller = new FC(
             registry, queue, topology, mqtt,
             statusPublisher,
             persistence: null,
-            NullLogger<FleetController>.Instance);
+            NullLogger<FC>.Instance);
 
         return new Fixture(controller, registry, queue, mqtt, statusPublisher);
     }
@@ -405,11 +406,11 @@ public class FleetControllerTests
         topology.AddEdge("E-MID-DST", "MID", "DST");
         var mqtt            = new FakeMqttService();
         var statusPublisher = new FakeFleetStatusPublisher();
-        var controller      = new FleetController(
+        var controller      = new FC(
             registry, queue, topology, mqtt,
             statusPublisher,
             persistence: null,
-            NullLogger<FleetController>.Instance);
+            NullLogger<FC>.Instance);
         return new Fixture(controller, registry, queue, mqtt, statusPublisher);
     }
 

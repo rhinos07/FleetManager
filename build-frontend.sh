@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build script for FleetManager Frontend
+# Build script for FleetController Frontend
 
 set -e
 
-echo "Building FleetManager Frontend..."
+echo "Building FleetController Frontend..."
 echo "================================="
 
 cd "$(dirname "$0")/Vda5050FleetController/wwwroot"

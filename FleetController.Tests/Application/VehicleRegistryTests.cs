@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Vda5050FleetController.Application;
 using Vda5050FleetController.Domain.Models;
 
-namespace FleetManager.Tests.Application;
+namespace FleetController.Tests.Application;
 
 public class VehicleRegistryTests
 {
