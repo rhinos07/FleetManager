@@ -1,4 +1,6 @@
-import { OrderHistoryDto } from "../types/models";
+import { OrderHistoryDto, OrderSummary } from "../types/models";
+
+const HISTORY_STATUSES = ["Completed", "Failed"] as const;
 
 export class FleetOrderHistory extends HTMLElement {
   private tableBodyEl: HTMLElement | null = null;
@@ -10,7 +12,6 @@ export class FleetOrderHistory extends HTMLElement {
   connectedCallback(): void {
     this.render();
     this.tableBodyEl = this.querySelector("#historyRows");
-    this.loadHistory();
   }
 
   private render(): void {
@@ -31,7 +32,7 @@ export class FleetOrderHistory extends HTMLElement {
           </tr>
         </thead>
         <tbody id="historyRows">
-          <tr><td colspan="8" class="muted">Loading …</td></tr>
+          <tr><td colspan="8" class="muted">Waiting for live data …</td></tr>
         </tbody>
       </table>
     `;
@@ -51,6 +52,37 @@ export class FleetOrderHistory extends HTMLElement {
           '<tr><td colspan="8" class="muted">Failed to load order history.</td></tr>';
       }
     }
+  }
+
+  public updateOrders(orders: OrderSummary[]): void {
+    const historical = orders.filter((o) =>
+      (HISTORY_STATUSES as readonly string[]).includes(o.status)
+    );
+
+    if (!this.tableBodyEl) return;
+
+    if (historical.length === 0) {
+      this.tableBodyEl.innerHTML =
+        '<tr><td colspan="8" class="muted">No order history available</td></tr>';
+      return;
+    }
+
+    this.tableBodyEl.innerHTML = historical
+      .map(
+        (o) => `
+          <tr>
+            <td>${this.esc(o.orderId)}</td>
+            <td>${this.esc(o.sourceId)}</td>
+            <td>${this.esc(o.destId)}</td>
+            <td><span class="status-badge status-${o.status.toLowerCase()}">${this.esc(o.status)}</span></td>
+            <td>${o.vehicleId ? this.esc(o.vehicleId) : "<span class='muted'>—</span>"}</td>
+            <td><span class="muted">—</span></td>
+            <td><span class="muted">—</span></td>
+            <td><span class="muted">—</span></td>
+          </tr>
+        `
+      )
+      .join("");
   }
 
   private renderRows(orders: OrderHistoryDto[]): void {

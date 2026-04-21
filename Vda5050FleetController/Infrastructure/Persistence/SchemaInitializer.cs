@@ -68,6 +68,7 @@ public class SchemaInitializer : IHostedService
                 completed_at         TIMESTAMPTZ NOT NULL
             );", ct);
 
+        // Migration: add started_at to existing databases created before this column was introduced.
         await db.ExecuteAsync(@"
             ALTER TABLE order_history ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;", ct);
 
