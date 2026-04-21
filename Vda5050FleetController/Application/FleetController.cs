@@ -308,8 +308,11 @@ public class FleetController
             return;
 
         // Nodes currently occupied by any vehicle (for eviction target selection).
+        // Use DistinctBy to guard against duplicate LastNodeId values (should not happen
+        // in normal operation but prevents a ToDictionary key-collision exception).
         var vehiclesAtChargingNode = _registry.All()
             .Where(v => IsChargingNode(v.LastNodeId))
+            .DistinctBy(v => v.LastNodeId)
             .ToDictionary(v => v.LastNodeId!, v => v);
 
         foreach (var vehicle in vehiclesNeedingCharge)

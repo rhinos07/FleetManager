@@ -7,7 +7,7 @@ export class FleetVehicleTable extends HTMLElement {
   private nodeSelect: HTMLSelectElement | null = null;
   private sendBtn: HTMLButtonElement | null = null;
   private statusEl: HTMLElement | null = null;
-  private batterySettings: FleetBatterySettings | null = null;
+  private batterySettingsComponent: FleetBatterySettings | null = null;
 
   private vehicles: VehicleSummary[] = [];
   private nodes: TopologyNode[] = [];
@@ -23,7 +23,7 @@ export class FleetVehicleTable extends HTMLElement {
     this.nodeSelect = this.querySelector("#repoNode");
     this.sendBtn = this.querySelector("#repoSend");
     this.statusEl = this.querySelector("#repoStatus");
-    this.batterySettings = this.querySelector("fleet-battery-settings");
+    this.batterySettingsComponent = this.querySelector("fleet-battery-settings");
 
     this.sendBtn?.addEventListener("click", () => this.sendReposition());
   }
@@ -83,7 +83,7 @@ export class FleetVehicleTable extends HTMLElement {
   }
 
   public updateBatteryThreshold(threshold: number): void {
-    this.batterySettings?.updateThreshold(threshold);
+    this.batterySettingsComponent?.updateThreshold(threshold);
   }
 
   private renderTable(): void {

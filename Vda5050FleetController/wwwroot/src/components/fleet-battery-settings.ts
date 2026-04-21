@@ -55,9 +55,9 @@ export class FleetBatterySettings extends HTMLElement {
 
   private async saveThreshold(): Promise<void> {
     const raw = this.thresholdInput?.value ?? "";
-    const value = parseFloat(raw);
+    const thresholdValue = parseFloat(raw);
 
-    if (isNaN(value) || value < 1 || value > 99) {
+    if (isNaN(thresholdValue) || thresholdValue < 1 || thresholdValue > 99) {
       this.setStatus("Please enter a value between 1 and 99.", "error");
       return;
     }
@@ -69,12 +69,12 @@ export class FleetBatterySettings extends HTMLElement {
       const res = await fetch("/fleet/settings/battery-threshold", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threshold: value }),
+        body: JSON.stringify({ threshold: thresholdValue }),
       });
 
       if (res.ok) {
-        this.currentThreshold = value;
-        this.setStatus(`Threshold saved: ${value}%`, "ok");
+        this.currentThreshold = thresholdValue;
+        this.setStatus(`Threshold saved: ${thresholdValue}%`, "ok");
       } else {
         const text = await res.text();
         this.setStatus(`Error: ${text}`, "error");
