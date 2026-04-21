@@ -1,4 +1,4 @@
-# FleetManager — VDA5050 Fleet Controller
+# FleetController — VDA5050 Fleet Controller
 
 ASP.NET Core 8 service for orchestrating AGV fleets via the **VDA5050 v2** protocol over MQTT.
 
