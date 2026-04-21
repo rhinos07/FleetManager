@@ -258,6 +258,9 @@ public class FleetController
             pickActions,
             dropActions);
 
+        // Move any idle vehicle that is parked on a node the assigned vehicle needs to traverse
+        await TryResolveBlockersAsync(nodes, vehicle, ct);
+
         // Build VDA5050 order
         var vdaOrder = new Order
         {
@@ -278,6 +281,83 @@ public class FleetController
         await _mqtt.PublishOrderAsync(vdaOrder, ct);
         transportOrder.Start();
         await _persistence.SaveOrderAsync(transportOrder, ct);
+    }
+
+    // ── Blocker resolution ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// For each node on <paramref name="pathNodes"/>, checks whether an idle vehicle (other than
+    /// <paramref name="assignedVehicle"/>) is parked there.  If so, sends that vehicle a short
+    /// "dodge" order to the nearest free adjacent node so it clears the way.
+    /// </summary>
+    private async Task TryResolveBlockersAsync(List<Node> pathNodes,
+        Vehicle assignedVehicle, CancellationToken ct)
+    {
+        // Build a lookup: nodeId → list of idle vehicles parked there
+        var idleAtNode = _registry.All()
+            .Where(v => v.VehicleId != assignedVehicle.VehicleId
+                        && v.IsAvailable
+                        && v.LastNodeId is not null)
+            .GroupBy(v => v.LastNodeId!)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        if (idleAtNode.Count == 0)
+            return;
+
+        // Track which nodes are about to become occupied by dodging vehicles
+        // so we don't route two vehicles to the same spot.
+        var pendingOccupied = new HashSet<string>(idleAtNode.Keys);
+
+        foreach (var pathNode in pathNodes)
+        {
+            if (!idleAtNode.TryGetValue(pathNode.NodeId, out var blockers))
+                continue;
+
+            foreach (var blocker in blockers)
+            {
+                var dodgeTarget = _topology.GetNeighborNodeIds(pathNode.NodeId)
+                    .FirstOrDefault(n => !pendingOccupied.Contains(n));
+
+                if (dodgeTarget is null)
+                {
+                    _log.LogWarning(
+                        "No free neighbour for blocking vehicle {VehicleId} at node {NodeId}; skipping dodge",
+                        blocker.VehicleId, pathNode.NodeId);
+                    break;
+                }
+
+                _log.LogInformation(
+                    "Vehicle {VehicleId} is blocking node {NodeId} — sending dodge order to {DodgeTarget}",
+                    blocker.VehicleId, pathNode.NodeId, dodgeTarget);
+
+                await SendDodgeOrderAsync(blocker, pathNode.NodeId, dodgeTarget, ct);
+                pendingOccupied.Add(dodgeTarget);
+            }
+
+            pendingOccupied.Remove(pathNode.NodeId);
+        }
+    }
+
+    /// <summary>
+    /// Sends a minimal VDA5050 order that moves <paramref name="vehicle"/> from
+    /// <paramref name="fromNodeId"/> to <paramref name="toNodeId"/> without any pick/drop actions.
+    /// The order ID starts with <c>DODGE-</c> so it is easy to recognise in logs.
+    /// </summary>
+    private async Task SendDodgeOrderAsync(Vehicle vehicle, string fromNodeId,
+        string toNodeId, CancellationToken ct)
+    {
+        var (nodes, edges) = _topology.BuildPath(fromNodeId, toNodeId, [], []);
+        var order = new Order
+        {
+            HeaderId      = vehicle.NextHeaderId(),
+            Manufacturer  = vehicle.Manufacturer,
+            SerialNumber  = vehicle.SerialNumber,
+            OrderId       = $"DODGE-{Guid.NewGuid():N}"[..24],
+            OrderUpdateId = 0,
+            Nodes         = nodes,
+            Edges         = edges
+        };
+        await _mqtt.PublishOrderAsync(order, ct);
     }
 
     // ── Inbound: Vehicle state update ────────────────────────────────────────

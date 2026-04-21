@@ -44,6 +44,12 @@ public class Vehicle
     public string?          CurrentOrderId { get; private set; }
 
     /// <summary>
+    /// The node ID the vehicle last reported as its current position, or null if not yet known.
+    /// Updated from the <c>lastNodeId</c> field of each incoming VDA5050 state message.
+    /// </summary>
+    public string?          LastNodeId     { get; private set; }
+
+    /// <summary>
     /// Timestamp of the last received state or connection message.
     /// </summary>
     public DateTime         LastSeen    { get; private set; }
@@ -90,6 +96,9 @@ public class Vehicle
         CurrentOrderId = string.IsNullOrEmpty(state.OrderId) ? null : state.OrderId;
         _activeErrors  = [.. state.Errors];
         LastSeen       = DateTime.UtcNow;
+
+        if (!string.IsNullOrEmpty(state.LastNodeId))
+            LastNodeId = state.LastNodeId;
 
         Status = DetermineStatus(state);
     }
@@ -453,6 +462,18 @@ public class TopologyMap
     /// <returns>A collection of tuples containing edge IDs and their start/end node IDs.</returns>
     public IEnumerable<(string EdgeId, string From, string To)> GetAllEdges()
         => _edges.Select(kvp => (kvp.Key, kvp.Value.From, kvp.Value.To));
+
+    /// <summary>
+    /// Returns the IDs of all nodes directly connected to <paramref name="nodeId"/> by a topology edge,
+    /// in either direction.
+    /// </summary>
+    /// <param name="nodeId">The node whose neighbours are to be found.</param>
+    /// <returns>Distinct node IDs of adjacent nodes; empty when <paramref name="nodeId"/> has no edges.</returns>
+    public IEnumerable<string> GetNeighborNodeIds(string nodeId)
+        => _edges.Values
+            .Where(e => e.From == nodeId || e.To == nodeId)
+            .Select(e => e.From == nodeId ? e.To : e.From)
+            .Distinct();
 
     /// <summary>
     /// Builds a VDA5050-compliant path from source to destination.
