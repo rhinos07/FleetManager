@@ -1,6 +1,4 @@
-import { OrderSummary } from "../types/models";
-
-const HISTORY_STATUSES = ["Completed", "Failed"] as const;
+import { OrderHistoryDto } from "../types/models";
 
 export class FleetOrderHistory extends HTMLElement {
   private tableBodyEl: HTMLElement | null = null;
@@ -12,6 +10,7 @@ export class FleetOrderHistory extends HTMLElement {
   connectedCallback(): void {
     this.render();
     this.tableBodyEl = this.querySelector("#historyRows");
+    this.loadHistory();
   }
 
   private render(): void {
@@ -26,41 +25,63 @@ export class FleetOrderHistory extends HTMLElement {
             <th>Destination</th>
             <th>Status</th>
             <th>Vehicle</th>
+            <th>Created</th>
+            <th>Started</th>
+            <th>Completed</th>
           </tr>
         </thead>
         <tbody id="historyRows">
-          <tr><td colspan="5" class="muted">Waiting for live data …</td></tr>
+          <tr><td colspan="8" class="muted">Loading …</td></tr>
         </tbody>
       </table>
     `;
   }
 
-  public updateOrders(orders: OrderSummary[]): void {
+  public async loadHistory(): Promise<void> {
     if (!this.tableBodyEl) return;
 
-    const historical = orders.filter((o) =>
-      (HISTORY_STATUSES as readonly string[]).includes(o.status)
-    );
+    try {
+      const response = await fetch("/fleet/orders/history");
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const orders: OrderHistoryDto[] = await response.json();
+      this.renderRows(orders);
+    } catch (err) {
+      if (this.tableBodyEl) {
+        this.tableBodyEl.innerHTML =
+          '<tr><td colspan="8" class="muted">Failed to load order history.</td></tr>';
+      }
+    }
+  }
 
-    if (historical.length === 0) {
+  private renderRows(orders: OrderHistoryDto[]): void {
+    if (!this.tableBodyEl) return;
+
+    if (orders.length === 0) {
       this.tableBodyEl.innerHTML =
-        '<tr><td colspan="5" class="muted">No order history available</td></tr>';
+        '<tr><td colspan="8" class="muted">No order history available</td></tr>';
       return;
     }
 
-    this.tableBodyEl.innerHTML = historical
+    this.tableBodyEl.innerHTML = orders
       .map(
         (o) => `
           <tr>
             <td>${this.esc(o.orderId)}</td>
             <td>${this.esc(o.sourceId)}</td>
             <td>${this.esc(o.destId)}</td>
-            <td><span class="status-badge status-${o.status.toLowerCase()}">${this.esc(o.status)}</span></td>
-            <td>${o.vehicleId ? this.esc(o.vehicleId) : "<span class='muted'>—</span>"}</td>
+            <td><span class="status-badge status-${o.finalStatus.toLowerCase()}">${this.esc(o.finalStatus)}</span></td>
+            <td>${o.assignedVehicleId ? this.esc(o.assignedVehicleId) : "<span class='muted'>—</span>"}</td>
+            <td>${this.formatDate(o.createdAt)}</td>
+            <td>${o.startedAt ? this.formatDate(o.startedAt) : "<span class='muted'>—</span>"}</td>
+            <td>${this.formatDate(o.completedAt)}</td>
           </tr>
         `
       )
       .join("");
+  }
+
+  private formatDate(iso: string): string {
+    return new Date(iso).toLocaleString();
   }
 
   private esc(str: string): string {
