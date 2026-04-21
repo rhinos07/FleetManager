@@ -10,7 +10,7 @@ namespace Vda5050FleetController.Application;
 public class VehicleRegistry
 {
     private readonly Dictionary<string, Vehicle> _vehicles = [];
-    private readonly ILogger<VehicleRegistry> _log;
+    private readonly ILogger<VehicleRegistry>    _log;
 
     public VehicleRegistry(ILogger<VehicleRegistry> log) => _log = log;
 
@@ -19,7 +19,7 @@ public class VehicleRegistry
         var id = $"{manufacturer}/{serial}";
         if (!_vehicles.TryGetValue(id, out var vehicle))
         {
-            vehicle = new Vehicle(manufacturer, serial);
+            vehicle       = new Vehicle(manufacturer, serial);
             _vehicles[id] = vehicle;
             _log.LogInformation("Registered new vehicle {VehicleId}", id);
         }
@@ -40,27 +40,59 @@ public class VehicleRegistry
 
 public class TransportOrderQueue
 {
-    private readonly Queue<TransportOrder> _pending = [];
-    private readonly Dictionary<string, TransportOrder> _active = [];
-    private readonly ILogger<TransportOrderQueue> _log;
+    private readonly List<TransportOrder>              _pending = [];
+    private readonly Dictionary<string, TransportOrder> _active  = [];
+    private readonly ILogger<TransportOrderQueue>      _log;
 
     public TransportOrderQueue(ILogger<TransportOrderQueue> log) => _log = log;
 
     public void Enqueue(TransportOrder order)
     {
-        _pending.Enqueue(order);
+        _pending.Add(order);
         _log.LogInformation("Queued TransportOrder {OrderId}: {Src} → {Dst}",
             order.OrderId, order.SourceId, order.DestId);
     }
 
     public TransportOrder? DequeuePending()
-        => _pending.TryDequeue(out var order) ? order : null;
+    {
+        if (_pending.Count == 0) return null;
+        var order = _pending[0];
+        _pending.RemoveAt(0);
+        return order;
+    }
 
     public void MarkActive(TransportOrder order)
         => _active[order.OrderId] = order;
 
     public TransportOrder? FindActive(string orderId)
         => _active.GetValueOrDefault(orderId);
+
+    /// <summary>
+    /// Removes a pending order from the queue by order ID.
+    /// Returns true if the order was found and removed, false otherwise.
+    /// </summary>
+    public bool RemovePending(string orderId)
+    {
+        var index = _pending.FindIndex(o => o.OrderId == orderId);
+        if (index < 0) return false;
+        _pending.RemoveAt(index);
+        _log.LogInformation("Cancelled pending TransportOrder {OrderId}", orderId);
+        return true;
+    }
+
+    /// <summary>
+    /// Replaces a pending order in-place with a new order object, preserving queue position.
+    /// Returns true if the order was found and replaced, false otherwise.
+    /// </summary>
+    public bool ReplacePending(string orderId, TransportOrder replacement)
+    {
+        var index = _pending.FindIndex(o => o.OrderId == orderId);
+        if (index < 0) return false;
+        _pending[index] = replacement;
+        _log.LogInformation("Updated pending TransportOrder {OrderId}: {Src} → {Dst}",
+            replacement.OrderId, replacement.SourceId, replacement.DestId);
+        return true;
+    }
 
     public void Complete(string orderId)
     {
@@ -78,7 +110,7 @@ public class TransportOrderQueue
         => _pending.Concat(_active.Values);
 
     public int PendingCount => _pending.Count;
-    public int ActiveCount => _active.Count;
+    public int ActiveCount  => _active.Count;
 }
 
 // ── Fleet Controller ──────────────────────────────────────────────────────────
@@ -89,11 +121,11 @@ public class TransportOrderQueue
 /// </summary>
 public class FleetController
 {
-    private readonly VehicleRegistry _registry;
-    private readonly TransportOrderQueue _queue;
-    private readonly TopologyMap _topology;
-    private readonly IVda5050MqttService _mqtt;
-    private readonly IFleetStatusPublisher _statusPublisher;
+    private readonly VehicleRegistry          _registry;
+    private readonly TransportOrderQueue      _queue;
+    private readonly TopologyMap              _topology;
+    private readonly IVda5050MqttService      _mqtt;
+    private readonly IFleetStatusPublisher    _statusPublisher;
     private readonly IFleetPersistenceService _persistence;
     private readonly ILogger<FleetController> _log;
 
@@ -108,24 +140,24 @@ public class FleetController
     /// <param name="persistence">Optional persistence service for durability (defaults to no-op).</param>
     /// <param name="log">Logger instance.</param>
     public FleetController(
-        VehicleRegistry registry,
-        TransportOrderQueue queue,
-        TopologyMap topology,
-        IVda5050MqttService mqtt,
-        IFleetStatusPublisher? statusPublisher,
+        VehicleRegistry          registry,
+        TransportOrderQueue      queue,
+        TopologyMap              topology,
+        IVda5050MqttService      mqtt,
+        IFleetStatusPublisher?   statusPublisher,
         IFleetPersistenceService? persistence,
         ILogger<FleetController> log)
     {
-        _registry = registry;
-        _queue = queue;
-        _topology = topology;
-        _mqtt = mqtt;
+        _registry        = registry;
+        _queue           = queue;
+        _topology        = topology;
+        _mqtt            = mqtt;
         _statusPublisher = statusPublisher ?? NoOpFleetStatusPublisher.Instance;
-        _persistence = persistence ?? NoOpFleetPersistenceService.Instance;
-        _log = log;
+        _persistence     = persistence    ?? NoOpFleetPersistenceService.Instance;
+        _log             = log;
 
         // Wire up MQTT events
-        _mqtt.OnStateReceived += HandleVehicleStateAsync;
+        _mqtt.OnStateReceived      += HandleVehicleStateAsync;
         _mqtt.OnConnectionReceived += HandleConnectionAsync;
     }
 
@@ -135,15 +167,44 @@ public class FleetController
         string? loadId = null, CancellationToken ct = default)
     {
         var order = new TransportOrder(
-            orderId: $"TO-{Guid.NewGuid():N}"[..16],
+            orderId:  $"TO-{Guid.NewGuid():N}"[..16],
             sourceId: sourceStationId,
-            destId: destStationId,
-            loadId: loadId
+            destId:   destStationId,
+            loadId:   loadId
         );
 
         _queue.Enqueue(order);
         await _persistence.SaveOrderAsync(order, ct);
         await DispatchAndPublishStatusAsync(ct);
+    }
+
+    /// <summary>
+    /// Cancels a pending transport order by ID.
+    /// Returns false if the order is not found in the pending queue (already dispatched or unknown).
+    /// </summary>
+    public async Task<bool> CancelOrderAsync(string orderId, CancellationToken ct = default)
+    {
+        if (!_queue.RemovePending(orderId))
+            return false;
+
+        await PublishStatusAsync(ct);
+        return true;
+    }
+
+    /// <summary>
+    /// Updates the source, destination and load of a pending transport order.
+    /// Returns false if the order is not found in the pending queue (already dispatched or unknown).
+    /// </summary>
+    public async Task<bool> UpdateOrderAsync(string orderId, string sourceStationId,
+        string destStationId, string? loadId, CancellationToken ct = default)
+    {
+        var updated = new TransportOrder(orderId, sourceStationId, destStationId, loadId);
+        if (!_queue.ReplacePending(orderId, updated))
+            return false;
+
+        await _persistence.SaveOrderAsync(updated, ct);
+        await PublishStatusAsync(ct);
+        return true;
     }
 
     private async Task DispatchAndPublishStatusAsync(CancellationToken ct = default)
@@ -264,17 +325,17 @@ public class FleetController
             "Dispatch order {OrderId} to vehicle {VehicleId}: checking {PathNodeCount} path nodes for blockers",
             transportOrder.OrderId, vehicle.VehicleId, pathNodeIds.Count);
         await TryResolveBlockersAsync(pathNodeIds, vehicle, ct);
-
+        
         // Build VDA5050 order
         var vdaOrder = new Order
         {
-            HeaderId = vehicle.NextHeaderId(),
-            Manufacturer = vehicle.Manufacturer,
-            SerialNumber = vehicle.SerialNumber,
-            OrderId = transportOrder.OrderId,
+            HeaderId      = vehicle.NextHeaderId(),
+            Manufacturer  = vehicle.Manufacturer,
+            SerialNumber  = vehicle.SerialNumber,
+            OrderId       = transportOrder.OrderId,
             OrderUpdateId = 0,
-            Nodes = nodes,
-            Edges = edges
+            Nodes         = nodes,
+            Edges         = edges
         };
 
         _log.LogInformation(
@@ -438,13 +499,13 @@ public class FleetController
         var (nodes, edges) = _topology.BuildPath(fromNodeId, toNodeId, [], []);
         var order = new Order
         {
-            HeaderId = vehicle.NextHeaderId(),
-            Manufacturer = vehicle.Manufacturer,
-            SerialNumber = vehicle.SerialNumber,
-            OrderId = $"DODGE-{Guid.NewGuid():N}"[..24],
+            HeaderId      = vehicle.NextHeaderId(),
+            Manufacturer  = vehicle.Manufacturer,
+            SerialNumber  = vehicle.SerialNumber,
+            OrderId       = $"DODGE-{Guid.NewGuid():N}"[..24],
             OrderUpdateId = 0,
-            Nodes = nodes,
-            Edges = edges
+            Nodes         = nodes,
+            Edges         = edges
         };
         _log.LogDebug(
             "SendDodgeOrderAsync: Publishing dodge order {DodgeOrderId} for vehicle {VehicleId}",
@@ -568,7 +629,7 @@ public class FleetController
 
         var ia = new InstantActions
         {
-            HeaderId = vehicle.NextHeaderId(),
+            HeaderId     = vehicle.NextHeaderId(),
             Manufacturer = vehicle.Manufacturer,
             SerialNumber = vehicle.SerialNumber,
             Actions =
@@ -589,38 +650,38 @@ public class FleetController
 
     public FleetStatus GetStatus() => new()
     {
-        Vehicles = _registry.All().Select(v => new VehicleSummary
+        Vehicles      = _registry.All().Select(v => new VehicleSummary
         {
-            VehicleId = v.VehicleId,
-            Status = v.Status.ToString(),
-            Position = v.Position,
-            Battery = v.Battery?.BatteryCharge,
-            OrderId = v.CurrentOrderId,
-            LastSeen = v.LastSeen
+            VehicleId  = v.VehicleId,
+            Status     = v.Status.ToString(),
+            Position   = v.Position,
+            Battery    = v.Battery?.BatteryCharge,
+            OrderId    = v.CurrentOrderId,
+            LastSeen   = v.LastSeen
         }).ToList(),
         PendingOrders = _queue.PendingCount,
-        ActiveOrders = _queue.ActiveCount,
+        ActiveOrders  = _queue.ActiveCount,
         Nodes = _topology.GetAllNodes().Select(n => new TopologyNodeDto
         {
             NodeId = n.NodeId,
-            X = n.Position.X,
-            Y = n.Position.Y,
-            Theta = n.Position.Theta,
-            MapId = n.Position.MapId
+            X      = n.Position.X,
+            Y      = n.Position.Y,
+            Theta  = n.Position.Theta,
+            MapId  = n.Position.MapId
         }).ToList(),
         Edges = _topology.GetAllEdges().Select(e => new TopologyEdgeDto
         {
             EdgeId = e.EdgeId,
-            From = e.From,
-            To = e.To
+            From   = e.From,
+            To     = e.To
         }).ToList(),
         Orders = _queue.GetAllOrders().Select(o => new OrderSummary
         {
-            OrderId = o.OrderId,
-            SourceId = o.SourceId,
-            DestId = o.DestId,
-            LoadId = o.LoadId,
-            Status = o.Status.ToString(),
+            OrderId   = o.OrderId,
+            SourceId  = o.SourceId,
+            DestId    = o.DestId,
+            LoadId    = o.LoadId,
+            Status    = o.Status.ToString(),
             VehicleId = o.AssignedVehicleId
         }).ToList()
     };
