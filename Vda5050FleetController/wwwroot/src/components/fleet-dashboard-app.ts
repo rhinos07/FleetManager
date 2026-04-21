@@ -138,6 +138,7 @@ export class FleetDashboardApp extends HTMLElement {
 
     // Update order list and history
     this.orderList?.updateOrders(status.orders);
+    this.orderList?.updateNodes(status.nodes);
     this.orderHistory?.updateOrders(status.orders);
   }
 }
